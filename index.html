@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ParkSense AI — Bengaluru Parking Intelligence</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f0f0f;color:#e8e8e8;min-height:100vh}
+.app{max-width:1280px;margin:0 auto;padding:24px}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid #2a2a2a}
+.logo{font-size:20px;font-weight:700;color:#fff;letter-spacing:-.5px}
+.logo span{color:#E24B4A}
+.badge{font-size:11px;background:#1a1a1a;border:1px solid #333;padding:4px 12px;border-radius:20px;color:#888}
+h2{font-size:13px;font-weight:500;color:#666;margin-bottom:12px;text-transform:uppercase;letter-spacing:.08em}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+.card{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:16px 20px}
+.metric{background:#141414;border:1px solid #222;border-radius:10px;padding:14px 16px}
+.metric-label{font-size:11px;color:#555;margin-bottom:4px}
+.metric-value{font-size:22px;font-weight:600;color:#fff}
+.metric-sub{font-size:11px;color:#444;margin-top:2px}
+.map-wrap{position:relative;width:100%;height:280px;background:#111;border-radius:8px;overflow:hidden;border:1px solid #222}
+.map-dot{position:absolute;border-radius:50%;transform:translate(-50%,-50%);cursor:pointer;transition:all .2s}
+.map-dot.pulsing::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:2px solid #E24B4A;animation:pulse 1.5s infinite;opacity:.7}
+@keyframes pulse{0%{opacity:.8;transform:scale(1)}100%{opacity:0;transform:scale(2)}}
+.map-tooltip{position:absolute;background:#1e1e1e;border:1px solid #333;border-radius:8px;padding:8px 12px;font-size:12px;pointer-events:none;display:none;z-index:20;white-space:nowrap;color:#ddd}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px}
+.bar-track{flex:1;height:6px;background:#222;border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px}
+.alert-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;margin-bottom:6px;font-size:12px}
+.zone-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #222;cursor:pointer}
+.zone-row:last-child{border-bottom:none}
+.zone-row:hover{opacity:.8}
+.progress{width:100%;height:5px;background:#222;border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px}
+.ctrl-row{display:flex;gap:16px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap}
+.ctrl-group{display:flex;flex-direction:column;gap:5px}
+.ctrl-label{font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.06em}
+select{font-size:12px;padding:7px 12px;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#ddd;cursor:pointer;outline:none}
+select:hover{border-color:#555}
+.forecast-item{background:#141414;border-radius:8px;padding:9px 12px;display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.fc-hour{font-size:13px;font-weight:600;min-width:48px;color:#fff}
+.fc-bar-wrap{flex:1;height:5px;background:#222;border-radius:3px;overflow:hidden}
+.fc-bar{height:100%;border-radius:3px}
+.fc-label{font-size:11px;font-weight:600;min-width:56px;text-align:right}
+.section-tab{display:flex;gap:4px;margin-bottom:16px}
+.tab-btn{font-size:12px;padding:6px 16px;border-radius:20px;cursor:pointer;border:1px solid #333;background:transparent;color:#666;transition:all .15s}
+.tab-btn.active{background:#1e1e1e;color:#fff;border-color:#444}
+#tab-dashboard{display:block}
+#tab-predict{display:none}
+.clock{font-size:13px;font-weight:600;color:#fff;background:#1a1a1a;border:1px solid #333;padding:6px 14px;border-radius:20px}
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="topbar">
+  <div>
+    <div class="logo">Park<span>Sense</span> AI</div>
+    <div style="font-size:12px;color:#444;margin-top:2px">Bengaluru Parking Violation Intelligence · Nov 2023 – Apr 2024</div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <div class="clock" id="clockEl">--:-- IST</div>
+    <div class="badge">298,450 violations analysed</div>
+  </div>
+</div>
+
+<div class="section-tab">
+  <button class="tab-btn active" onclick="switchTab('dashboard')">Intelligence dashboard</button>
+  <button class="tab-btn" onclick="switchTab('predict')">Prediction engine</button>
+</div>
+
+<!-- DASHBOARD TAB -->
+<div id="tab-dashboard">
+  <div class="grid4">
+    <div class="metric"><div class="metric-label">Total violations</div><div class="metric-value">2,98,450</div><div class="metric-sub">Nov 2023 – Apr 2024</div></div>
+    <div class="metric"><div class="metric-label">Hotspot zones</div><div class="metric-value">1,788</div><div class="metric-sub">high-density clusters</div></div>
+    <div class="metric"><div class="metric-label">Junction violations</div><div class="metric-value">1,50,570</div><div class="metric-sub">50.4% near junctions</div></div>
+    <div class="metric"><div class="metric-label">Peak window</div><div class="metric-value">4–6 AM</div><div class="metric-sub">highest load</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Violation hotspot map</h2>
+      <div class="map-wrap" id="dashMap"><div class="map-tooltip" id="dashTT"></div></div>
+      <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;color:#555">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#E24B4A;margin-right:4px"></span>Critical</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#EF9F27;margin-right:4px"></span>High</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#378ADD;margin-right:4px"></span>Medium</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#666;margin-right:4px"></span>Low</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Violations by hour of day</h2>
+      <div style="position:relative;width:100%;height:220px"><canvas id="hourlyChart"></canvas></div>
+      <div style="margin-top:8px;font-size:11px;color:#555">Night hours (12 AM–6 AM) account for <strong style="color:#ddd">45%</strong> of all violations</div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card">
+      <h2>Top violation types</h2>
+      <div id="violBars"></div>
+    </div>
+    <div class="card">
+      <h2>Top junctions</h2>
+      <div id="juncBars"></div>
+    </div>
+    <div class="card">
+      <h2>Vehicle breakdown</h2>
+      <div style="position:relative;width:100%;height:180px"><canvas id="vehicleChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Monthly trend</h2>
+      <div style="position:relative;width:100%;height:160px"><canvas id="monthlyChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Police station load</h2>
+      <div id="stationBars"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PREDICTION TAB -->
+<div id="tab-predict">
+  <div class="ctrl-row">
+    <div class="ctrl-group">
+      <div class="ctrl-label">Simulate hour</div>
+      <select id="hourSel"><option value="-1">Current time (live)</option></select>
+    </div>
+    <div class="ctrl-group">
+      <div class="ctrl-label">Day of week</div>
+      <select id="dowSel">
+        <option value="-1">Today</option>
+        <option value="0">Monday</option><option value="1">Tuesday</option>
+        <option value="2">Wednesday</option><option value="3">Thursday</option>
+        <option value="4">Friday</option><option value="5">Saturday</option><option value="6">Sunday</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="grid4" style="margin-bottom:16px">
+    <div class="metric"><div class="metric-label">Zones at risk</div><div class="metric-value" id="kpiZones">—</div></div>
+    <div class="metric"><div class="metric-label">Predicted violations</div><div class="metric-value" id="kpiViol">—</div></div>
+    <div class="metric"><div class="metric-label">Critical zones</div><div class="metric-value" id="kpiCrit">—</div></div>
+    <div class="metric"><div class="metric-label">Congestion impact</div><div class="metric-value" id="kpiCong">—</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Zone risk map · click to inspect</h2>
+      <div class="map-wrap" id="predMap"><div class="map-tooltip" id="predTT"></div></div>
+      <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;color:#555">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#E24B4A;margin-right:4px"></span>Critical</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#EF9F27;margin-right:4px"></span>High</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#378ADD;margin-right:4px"></span>Medium</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#666;margin-right:4px"></span>Low</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2 id="forecastTitle">Next 6-hour forecast · select a zone</h2>
+      <div id="forecastContent"><div style="color:#444;font-size:13px;text-align:center;padding:60px 0">Click a zone on the map to see its forecast</div></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Priority enforcement alerts</h2>
+      <div id="alertsList"></div>
+    </div>
+    <div class="card">
+      <h2>24-hour violation pulse</h2>
+      <div style="display:flex;align-items:flex-end;height:80px;gap:1px" id="pulseChart"></div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#444;margin-top:4px">
+        <span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>11 PM</span>
+      </div>
+      <div style="margin-top:14px">
+        <h2 style="margin-bottom:8px">Top zones by predicted load</h2>
+        <div id="zoneRankList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+const zones=[
+  {id:'Z01',name:'Upparpet core',lat:12.98,lon:77.58,total:24378,risk_score:100,peak_hour:3,station:'Upparpet',top_violation:'No Parking',hourly_profile:[0.526,0.441,0.654,1.0,0.838,0.65,0.452,0.209,0.151,0.058,0.002,0.001,0.0,0.0,0.0,0.0,0.001,0.0,0.001,0.685,0.492,0.349,0.322,0.463],dow_profile:[0.784,0.877,0.758,0.862,0.808,1.0,0.98]},
+  {id:'Z02',name:'Shivajinagar west',lat:12.98,lon:77.61,total:20166,risk_score:83,peak_hour:5,station:'Shivajinagar',top_violation:'Wrong Parking',hourly_profile:[0.227,0.201,0.627,0.675,0.882,1.0,0.639,0.325,0.238,0.109,0.004,0.001,0.001,0.0,0.0,0.0,0.0,0.0,0.002,0.022,0.012,0.018,0.047,0.103],dow_profile:[0.684,0.343,0.344,0.351,0.419,0.512,1.0]},
+  {id:'Z03',name:'City Market area',lat:12.96,lon:77.58,total:16316,risk_score:67,peak_hour:4,station:'City Market',top_violation:'Wrong Parking',hourly_profile:[0.7,0.5,0.702,0.738,1.0,0.875,0.598,0.241,0.135,0.065,0.003,0.001,0.004,0.002,0.002,0.025,0.165,0.295,0.342,0.985,0.561,0.299,0.311,0.46],dow_profile:[0.714,0.94,0.995,0.808,0.727,0.909,1.0]},
+  {id:'Z04',name:'MG Road corridor',lat:12.97,lon:77.58,total:11729,risk_score:48,peak_hour:4,station:'Upparpet',top_violation:'Wrong Parking',hourly_profile:[0.684,0.499,0.705,0.957,1.0,0.907,0.571,0.22,0.104,0.034,0.0,0.01,0.0,0.0,0.0,0.0,0.002,0.006,0.024,0.221,0.149,0.173,0.303,0.547],dow_profile:[0.502,0.816,0.66,0.672,0.676,0.656,1.0]},
+  {id:'Z05',name:'Malleshwaram north',lat:13.0,lon:77.55,total:9401,risk_score:39,peak_hour:2,station:'Malleshwaram',top_violation:'No Parking',hourly_profile:[0.6,0.52,1.0,0.88,0.76,0.61,0.44,0.21,0.09,0.03,0.01,0.0,0.0,0.0,0.0,0.01,0.04,0.08,0.12,0.45,0.38,0.29,0.35,0.5],dow_profile:[0.75,0.82,0.91,0.88,0.79,0.95,1.0]},
+  {id:'Z06',name:'Malleshwaram central',lat:13.01,lon:77.55,total:9211,risk_score:38,peak_hour:4,station:'Malleshwaram',top_violation:'Wrong Parking',hourly_profile:[0.55,0.42,0.68,0.85,1.0,0.92,0.62,0.28,0.11,0.04,0.01,0.0,0.0,0.0,0.0,0.02,0.05,0.09,0.18,0.48,0.35,0.27,0.32,0.47],dow_profile:[0.7,0.85,0.88,0.82,0.76,0.98,1.0]},
+  {id:'Z07',name:'HAL Airport road',lat:12.93,lon:77.69,total:9106,risk_score:37,peak_hour:23,station:'HAL Old Airport',top_violation:'No Parking',hourly_profile:[0.31,0.22,0.18,0.15,0.21,0.34,0.45,0.52,0.41,0.28,0.15,0.12,0.11,0.09,0.12,0.18,0.34,0.55,0.72,0.85,0.91,0.88,0.95,1.0],dow_profile:[0.78,0.72,0.81,0.85,0.92,0.95,1.0]},
+  {id:'Z08',name:'Shivajinagar east',lat:12.98,lon:77.6,total:7395,risk_score:30,peak_hour:3,station:'Shivajinagar',top_violation:'Wrong Parking',hourly_profile:[0.48,0.38,0.61,1.0,0.87,0.72,0.51,0.24,0.13,0.05,0.01,0.0,0.0,0.0,0.0,0.0,0.01,0.02,0.05,0.32,0.28,0.21,0.29,0.41],dow_profile:[0.68,0.74,0.79,0.85,0.81,0.95,1.0]},
+  {id:'Z09',name:'Vijayanagara north',lat:12.97,lon:77.55,total:6804,risk_score:28,peak_hour:6,station:'Vijayanagara',top_violation:'No Parking',hourly_profile:[0.41,0.32,0.45,0.58,0.78,0.88,1.0,0.72,0.38,0.18,0.05,0.02,0.01,0.0,0.01,0.03,0.08,0.14,0.22,0.41,0.35,0.28,0.33,0.39],dow_profile:[0.72,0.78,0.82,0.77,0.85,0.92,1.0]},
+  {id:'Z10',name:'Upparpet west',lat:12.98,lon:77.57,total:6217,risk_score:25,peak_hour:3,station:'Upparpet',top_violation:'No Parking',hourly_profile:[0.52,0.43,0.67,1.0,0.84,0.69,0.48,0.22,0.11,0.04,0.01,0.0,0.0,0.0,0.0,0.0,0.01,0.02,0.04,0.28,0.24,0.19,0.26,0.38],dow_profile:[0.76,0.81,0.75,0.84,0.79,1.0,0.95]},
+  {id:'Z11',name:'Kodigehalli junction',lat:13.07,lon:77.59,total:6213,risk_score:25,peak_hour:6,station:'Kodigehalli',top_violation:'Wrong Parking',hourly_profile:[0.28,0.21,0.34,0.52,0.72,0.88,1.0,0.68,0.35,0.15,0.04,0.01,0.0,0.0,0.01,0.03,0.07,0.12,0.19,0.38,0.31,0.24,0.29,0.34],dow_profile:[0.68,0.75,0.79,0.74,0.82,0.95,1.0]},
+  {id:'Z12',name:'Vijayanagara south',lat:12.97,lon:77.54,total:4046,risk_score:17,peak_hour:5,station:'Vijayanagara',top_violation:'Wrong Parking',hourly_profile:[0.35,0.28,0.42,0.61,0.82,1.0,0.78,0.41,0.19,0.08,0.02,0.0,0.0,0.0,0.0,0.02,0.06,0.11,0.17,0.34,0.28,0.22,0.27,0.32],dow_profile:[0.65,0.71,0.76,0.72,0.78,0.92,1.0]}
+];
+const congestionMult=[0.3,0.2,0.3,0.4,0.8,1.0,0.9,0.7,0.5,0.3,0.2,0.2,0.2,0.2,0.3,0.4,0.6,0.8,0.9,0.8,0.6,0.5,0.4,0.3];
+const riskColor={Critical:'#E24B4A',High:'#EF9F27',Medium:'#378ADD',Low:'#555'};
+
+function getIST(){const n=new Date();return new Date(n.getTime()+5.5*3600000);}
+function getRisk(s){return s>=70?'Critical':s>=40?'High':s>=20?'Medium':'Low';}
+function getPredScore(z,h,d){return Math.round(z.risk_score*z.hourly_profile[h]*z.dow_profile[d]*congestionMult[h]*100)/100;}
+function getHour(){const v=parseInt(document.getElementById('hourSel').value);return v===-1?getIST().getUTCHours():v;}
+function getDow(){const v=parseInt(document.getElementById('dowSel').value);return v===-1?getIST().getUTCDay():v;}
+
+function updateClock(){
+  const ist=getIST();
+  document.getElementById('clockEl').textContent=`${String(ist.getUTCHours()).padStart(2,'0')}:${String(ist.getUTCMinutes()).padStart(2,'0')} IST`;
+}
+
+function buildDashMap(){
+  const wrap=document.getElementById('dashMap');
+  const tt=document.getElementById('dashTT');
+  const W=wrap.offsetWidth,H=wrap.offsetHeight;
+  const latMin=12.90,latMax=13.12,lonMin=77.51,lonMax=77.72;
+  wrap.querySelectorAll('.map-dot').forEach(e=>e.remove());
+  const staticHotspots=[
+    {lat:12.981,lon:77.610,count:4411,risk:'Critical'},{lat:12.964,lon:77.577,count:3745,risk:'Critical'},
+    {lat:12.934,lon:77.691,count:3343,risk:'Critical'},{lat:12.971,lon:77.595,count:2890,risk:'Critical'},
+    {lat:12.957,lon:77.593,count:2654,risk:'Critical'},{lat:12.948,lon:77.574,count:2201,risk:'High'},
+    {lat:12.919,lon:77.623,count:1987,risk:'High'},{lat:12.976,lon:77.563,count:1756,risk:'High'},
+    {lat:12.942,lon:77.610,count:1543,risk:'High'},{lat:12.929,lon:77.648,count:1321,risk:'High'},
+    {lat:12.913,lon:77.601,count:987,risk:'Medium'},{lat:12.995,lon:77.585,count:876,risk:'Medium'},
+    {lat:12.908,lon:77.635,count:765,risk:'Medium'},{lat:12.968,lon:77.621,count:654,risk:'Medium'},
+    {lat:12.953,lon:77.553,count:543,risk:'Medium'},{lat:12.935,lon:77.572,count:432,risk:'Low'},
+    {lat:12.978,lon:77.642,count:321,risk:'Low'},{lat:12.921,lon:77.585,count:234,risk:'Low'}
+  ];
+  staticHotspots.forEach(p=>{
+    const x=((p.lon-lonMin)/(lonMax-lonMin))*W;
+    const y=H-((p.lat-latMin)/(latMax-latMin))*H;
+    const sz={Critical:16,High:12,Medium:9,Low:6}[p.risk];
+    const d=document.createElement('div');
+    d.className='map-dot';
+    d.style.cssText=`left:${x}px;top:${y}px;width:${sz}px;height:${sz}px;background:${riskColor[p.risk]};opacity:0.85`;
+    d.addEventListener('mouseenter',()=>{
+      tt.style.display='block';
+      tt.innerHTML=`<strong style="color:#fff">${p.risk} risk</strong><br>${p.count.toLocaleString()} violations`;
+      tt.style.left=(x+12)+'px';tt.style.top=(y-36)+'px';
+    });
+    d.addEventListener('mouseleave',()=>{tt.style.display='none';});
+    wrap.appendChild(d);
+  });
+}
+
+const hourlyData=[21762,17155,24770,25709,29102,34085,26890,14608,8556,3145,518,577,219,56,16,66,416,818,1971,10713,11834,19763,22840,22861];
+const gridC='rgba(255,255,255,0.05)',tickC='#555';
+
+new Chart(document.getElementById('hourlyChart'),{
+  type:'bar',
+  data:{labels:Array.from({length:24},(_,i)=>i%6===0?`${i}h`:''),datasets:[{data:hourlyData,backgroundColor:hourlyData.map((_,i)=>(i>=4&&i<=5)?'#E24B4A':(i>=19&&i<=23)?'#EF9F27':'#2a4a6b'),borderWidth:0,borderRadius:2}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.raw.toLocaleString()} violations`}}},scales:{x:{grid:{display:false},ticks:{color:tickC,font:{size:10}}},y:{grid:{color:gridC},ticks:{color:tickC,font:{size:10},callback:v=>v>=1000?(v/1000)+'k':v}}}}
+});
+
+function barRows(id,data,kFn,vFn,color){
+  const max=Math.max(...data.map(vFn));
+  document.getElementById(id).innerHTML=data.map(d=>`<div class="bar-row"><div style="width:130px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${kFn(d)}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(vFn(d)/max*100)}%;background:${color}"></div></div><div style="width:40px;text-align:right;color:#ccc;font-weight:600">${vFn(d)>=1000?(vFn(d)/1000).toFixed(0)+'k':vFn(d)}</div></div>`).join('');
+}
+barRows('violBars',[{v:'Wrong parking',c:164977},{v:'No parking',c:139050},{v:'Main road parking',c:23943},{v:'Defective plate',c:7848},{v:'Footpath parking',c:3757},{v:'Near bus stop',c:2403}],d=>d.v,d=>d.c,'#E24B4A');
+barRows('juncBars',[{j:'Safina Plaza',c:15449},{j:'KR Market',c:11538},{j:'Elite Junction',c:10718},{j:'Sagar Theatre',c:10549},{j:'Central Street',c:5388},{j:'Subbanna Junction',c:5189}],d=>d.j,d=>d.c,'#EF9F27');
+barRows('stationBars',[{s:'Upparpet',c:34468},{s:'Shivajinagar',c:28044},{s:'Malleshwaram',c:22200},{s:'HAL Old Airport',c:20819},{s:'City Market',c:17646},{s:'Vijayanagara',c:14652}],d=>d.s,d=>d.c,'#378ADD');
+
+new Chart(document.getElementById('vehicleChart'),{
+  type:'doughnut',
+  data:{labels:['Scooter','Car','Motorcycle','Passenger Auto','Maxi-cab','Others'],datasets:[{data:[94856,88870,40811,37813,11372,24728],backgroundColor:['#E24B4A','#378ADD','#EF9F27','#3B6D11','#534AB7','#555'],borderWidth:2,borderColor:'#1a1a1a'}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${Math.round(ctx.parsed/2984.50)}%`}}},cutout:'65%'}
+});
+
+new Chart(document.getElementById('monthlyChart'),{
+  type:'line',
+  data:{labels:['Nov','Dec','Jan','Feb','Mar','Apr'],datasets:[{data:[44119,63555,65813,54650,55231,15082],borderColor:'#378ADD',backgroundColor:'rgba(55,138,221,0.1)',fill:true,tension:0.3,pointRadius:4,pointBackgroundColor:'#378ADD',borderWidth:2}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:tickC,font:{size:11}}},y:{grid:{color:gridC},ticks:{color:tickC,font:{size:10},callback:v=>(v/1000)+'k'}}}}
+});
+
+// PREDICTION ENGINE
+let selectedZone=null;
+for(let i=0;i<24;i++){const o=document.createElement('option');o.value=i;o.textContent=`${String(i).padStart(2,'0')}:00`;document.getElementById('hourSel').appendChild(o);}
+['hourSel','dowSel'].forEach(id=>document.getElementById(id).addEventListener('change',renderPred));
+
+function buildPredMap(){
+  const wrap=document.getElementById('predMap');
+  const tt=document.getElementById('predTT');
+  const W=wrap.offsetWidth,H=wrap.offsetHeight;
+  const latMin=12.90,latMax=13.12,lonMin=77.51,lonMax=77.72;
+  wrap.querySelectorAll('.map-dot').forEach(e=>e.remove());
+  const h=getHour(),d=getDow();
+  zones.forEach(z=>{
+    const score=getPredScore(z,h,d);
+    const risk=getRisk(score);
+    const x=((z.lon-lonMin)/(lonMax-lonMin))*W;
+    const y=H-((z.lat-latMin)/(latMax-latMin))*H;
+    const sz={Critical:18,High:13,Medium:10,Low:7}[risk];
+    const el=document.createElement('div');
+    el.className='map-dot'+(risk==='Critical'?' pulsing':'');
+    if(selectedZone&&selectedZone.id===z.id)el.style.outline='2px solid #fff';
+    el.style.cssText=(el.style.cssText||'')+`;left:${x}px;top:${y}px;width:${sz}px;height:${sz}px;background:${riskColor[risk]};opacity:0.9`;
+    el.addEventListener('mouseenter',()=>{tt.style.display='block';tt.innerHTML=`<strong style="color:#fff">${z.name}</strong><br>${risk} · score ${score.toFixed(0)}<br>${z.station}`;tt.style.left=(x+12)+'px';tt.style.top=(y-40)+'px';});
+    el.addEventListener('mouseleave',()=>{tt.style.display='none';});
+    el.addEventListener('click',()=>{selectedZone=z;renderPred();showForecast(z);});
+    wrap.appendChild(el);
+  });
+}
+
+function showForecast(zone){
+  const h=getHour(),d=getDow();
+  document.getElementById('forecastTitle').textContent=`Next 6 hours · ${zone.name}`;
+  const hrs=Array.from({length:6},(_,i)=>{const hh=(h+i)%24;const s=getPredScore(zone,hh,d);return{h:hh,s,r:getRisk(s)};});
+  const mx=Math.max(...hrs.map(x=>x.s),1);
+  document.getElementById('forecastContent').innerHTML=hrs.map(({h,s,r})=>`<div class="forecast-item"><div class="fc-hour">${String(h).padStart(2,'0')}:00</div><div class="fc-bar-wrap"><div class="fc-bar" style="width:${Math.round(s/mx*100)}%;background:${riskColor[r]}"></div></div><div class="fc-label" style="color:${riskColor[r]}">${r}</div><div style="font-size:11px;color:#555;min-width:28px;text-align:right">${s.toFixed(0)}</div></div>`).join('');
+}
+
+function buildAlerts(){
+  const h=getHour(),d=getDow();
+  const top=zones.map(z=>({...z,s:getPredScore(z,h,d),r:getRisk(getPredScore(z,h,d))})).sort((a,b)=>b.s-a.s).slice(0,5);
+  const alertBg={Critical:'rgba(226,75,74,0.1)',High:'rgba(239,159,39,0.1)',Medium:'rgba(55,138,221,0.1)',Low:'rgba(100,100,100,0.1)'};
+  document.getElementById('alertsList').innerHTML=top.map(z=>`<div class="alert-row" style="background:${alertBg[z.r]};border-left:3px solid ${riskColor[z.r]}"><div style="flex:1"><div style="font-weight:600;color:#fff;font-size:13px">${z.name}</div><div style="color:#666;font-size:11px;margin-top:2px">${z.station} · ${z.top_violation} · score ${z.s.toFixed(0)}</div></div><span style="font-size:10px;font-weight:600;padding:3px 8px;border-radius:10px;background:${riskColor[z.r]}22;color:${riskColor[z.r]}">${z.r}</span></div>`).join('');
+}
+
+function buildPulse(){
+  const d=getDow();
+  const global=Array.from({length:24},(_,h)=>zones.reduce((s,z)=>s+getPredScore(z,h,d),0));
+  const mx=Math.max(...global);
+  const cur=getHour();
+  document.getElementById('pulseChart').innerHTML=global.map((v,i)=>{
+    const pct=Math.round(v/mx*100);
+    const col=i===cur?'#E24B4A':v/mx>0.7?'#EF9F27':v/mx>0.4?'#378ADD':'#2a2a2a';
+    return`<div style="flex:1;height:${Math.max(pct,4)}%;background:${col};border-radius:1px 1px 0 0;title:'${i}:00'"></div>`;
+  }).join('');
+}
+
+function buildZoneRank(){
+  const h=getHour(),d=getDow();
+  const top=zones.map(z=>({...z,s:getPredScore(z,h,d)})).sort((a,b)=>b.s-a.s).slice(0,5);
+  const mx=top[0].s;
+  document.getElementById('zoneRankList').innerHTML=top.map((z,i)=>`<div class="zone-row" onclick="selectedZone=zones.find(x=>x.id==='${z.id}');renderPred();showForecast(zones.find(x=>x.id==='${z.id}'))"><div style="font-size:11px;color:#444;min-width:16px">${i+1}</div><div style="flex:1;font-size:12px;color:#ccc">${z.name}</div><div class="progress" style="width:80px"><div class="progress-fill" style="width:${Math.round(z.s/mx*100)}%;background:${riskColor[getRisk(z.s)]}"></div></div><div style="font-size:11px;font-weight:600;min-width:28px;text-align:right;color:#666">${z.s.toFixed(0)}</div></div>`).join('');
+}
+
+function updateKPIs(){
+  const h=getHour(),d=getDow();
+  const scored=zones.map(z=>({...z,s:getPredScore(z,h,d),r:getRisk(getPredScore(z,h,d))}));
+  document.getElementById('kpiZones').textContent=scored.filter(z=>z.s>5).length;
+  document.getElementById('kpiViol').textContent=Math.round(scored.reduce((s,z)=>s+z.s,0)*2.8).toLocaleString();
+  document.getElementById('kpiCrit').textContent=scored.filter(z=>z.r==='Critical').length;
+  const c=congestionMult[h];
+  document.getElementById('kpiCong').textContent=c>=0.8?'Severe':c>=0.5?'High':c>=0.3?'Moderate':'Low';
+}
+
+function renderPred(){updateKPIs();buildPredMap();buildAlerts();buildPulse();buildZoneRank();updateClock();if(selectedZone)showForecast(selectedZone);}
+
+function switchTab(t){
+  document.getElementById('tab-dashboard').style.display=t==='dashboard'?'block':'none';
+  document.getElementById('tab-predict').style.display=t==='predict'?'block':'none';
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',(i===0&&t==='dashboard')||(i===1&&t==='predict')));
+  if(t==='predict')renderPred();
+}
+
+updateClock();
+setTimeout(buildDashMap,100);
+setInterval(()=>{updateClock();if(document.getElementById('hourSel').value==='-1')renderPred();},60000);
+</script>
+</body>
+</html>
